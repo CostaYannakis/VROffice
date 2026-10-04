@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Brick Office</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="dashboard">
+<header class="top">
+  <div class="brand"><span class="stud"></span><div><strong>Brick Office</strong><small>Virtual staff · real terminals</small></div></div>
+  <div class="top-stats"><span id="voiceState">Voice off</span><span id="usage">US$0.00 today</span></div>
+</header>
+<main class="layout">
+  <aside class="side">
+    <section class="card">
+      <h2>Quest 3</h2>
+      <p>Opens a private Cloudflare link. Open it in Quest Browser and enter the code.</p>
+      <button id="questStart" class="primary">Create Quest link</button>
+      <div id="questDetails" hidden>
+        <a id="questUrl" target="_blank" rel="noopener"></a>
+        <div class="code" id="questCode">------</div>
+        <div class="row"><button id="questCopy">Copy link</button><button id="questRenew">New code</button></div>
+        <button id="questStop" class="ghost">Close link</button>
+      </div>
+      <p class="muted" id="questNotice"></p>
+      <a class="muted" href="/office.html" target="_blank">Open desktop 3D preview ↗</a>
+    </section>
+    <section class="card">
+      <h2>Talk</h2>
+      <p id="talkTarget" class="muted">Pick a worker's <b>Talk</b> button.</p>
+      <div class="row"><button id="micToggle">Mic on</button><button id="hangUp" class="ghost">Hang up</button></div>
+      <form id="say" class="row"><input id="sayText" placeholder="Or type to the worker…" autocomplete="off"><button>Send</button></form>
+      <div id="transcript" class="transcript" aria-live="polite"></div>
+    </section>
+    <section class="card">
+      <h2>Project board</h2>
+      <p class="muted">The same cards as the whiteboard in the office. Workers can update them by voice.</p>
+      <div id="board" class="board"></div>
+      <form id="boardAdd" class="row"><input id="boardTitle" placeholder="New project…" maxlength="100" autocomplete="off"><button>Add</button></form>
+      <p class="muted" id="boardError"></p>
+    </section>
+    <section class="card">
+      <h2>Staff</h2>
+      <button id="hire" class="primary">Hire a worker</button>
+      <p class="muted">Workers run <code>claude</code> or <code>codex</code> in their project folder using your own logins. Click a screen to type into it directly.</p>
+    </section>
+  </aside>
+  <section id="floor" class="floor"></section>
+</main>
+
+<dialog id="editor">
+  <form id="workerForm" method="dialog">
+    <h2 id="editorTitle">Hire a worker</h2>
+    <label>ID <input name="id" required pattern="[a-z][a-z0-9-]{1,23}" placeholder="clyde"></label>
+    <label>Name <input name="name" required maxlength="24"></label>
+    <label>Agent <select name="agent"><option value="claude">Claude Code</option><option value="codex">OpenAI Codex</option><option value="shell">PowerShell</option></select></label>
+    <label>Project folder <input name="project" required placeholder="C:\Workspace\my-project"></label>
+    <label>Extra CLI arguments <input name="args" placeholder="--model sonnet   (space separated)"></label>
+    <label>Voice <select name="voice" id="voiceSelect"></select></label>
+    <div class="row colors">
+      <label>Torso <input type="color" name="torso"></label>
+      <label>Legs <input type="color" name="legs"></label>
+      <label>Hair <input type="color" name="hair"></label>
+    </div>
+    <label>Personality <textarea name="persona" rows="3" maxlength="600"></textarea></label>
+    <p class="muted" id="editorError"></p>
+    <div class="row"><button value="cancel" formnovalidate class="ghost">Cancel</button><button id="fire" type="button" class="danger" hidden>Let go</button><button id="saveWorker" class="primary" value="save">Save</button></div>
+  </form>
+</dialog>
+<script type="module" src="dashboard.js"></script>
+<script type="module" src="boardpanel.js"></script>
+</body>
+</html>

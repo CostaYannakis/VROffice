@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Brick Office</title>
+<link rel="stylesheet" href="style.css">
+<script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
+</head>
+<body class="office">
+<div id="stage"></div>
+<span id="status">LOADING</span>
+<section id="pair" hidden>
+  <div>
+    <p class="eyebrow">Brick Office · pair this headset</p>
+    <h1>Enter the code<br>shown on your PC.</h1>
+    <form id="pairForm" class="row"><input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required placeholder="000000" aria-label="Pairing code"><button class="primary">Connect</button></form>
+    <p id="pairError" role="alert"></p>
+  </div>
+</section>
+<aside class="panel" id="panel" hidden>
+  <p class="eyebrow">Brick Office · Quest 3</p>
+  <h1>Your staff are<br>at their desks.</h1>
+  <p class="muted">Walk up to a worker and talk; they hand your task to their real terminal. Grab, lift, slap, lead them by the hand or throw an office party.</p>
+  <div class="row mode"><button id="mode-enterprise">Enterprise</button><button id="mode-sandbox">Sandbox</button></div>
+  <p class="muted" id="modeHelp"></p>
+  <button id="voiceBtn" class="primary">1 · Enable voice & microphone</button>
+  <button id="enterBtn" disabled>2 · Enter the office (VR)</button>
+  <button id="refreshBtn" class="ghost">Reload office</button>
+  <div class="row"><button id="partyBtn">Office party</button><button id="arrangeBtn">Arrange desks</button></div>
+  <div class="row"><button id="bigBtn">Big screen</button><button id="resetLayout" class="ghost">Reset layout</button></div>
+  <p class="muted" id="xrHelp">Checking headset…</p>
+  <div id="roster"></div>
+  <p id="notice" class="muted" role="status"></p>
+  <p class="muted">Desktop preview: drag a worker to lift, Shift-click to slap, double-click to talk, click pad keys to press them. In the headset, turn your left palm towards you for the wrist menu.</p>
+</aside>
+<div class="hint" id="hint"></div>
+<script type="module" src="shell.js"></script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+data/
+__pycache__/
+*.log
+.env
+tools/cloudflared.exe
+workers.json
+.office-mode
+web/mods/sandbox/*
+!web/mods/sandbox/.gitkeep
