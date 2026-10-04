@@ -27,25 +27,45 @@ Pick one on the office page (or switch any time from the wrist menu, without lea
 
 The agents are told which office you're in, so "build me a lamp" lands in the right one.
 
-## Requirements
+## What you need
 
-- Windows 10/11 PC (terminals use ConPTY), Python 3.12+.
-- [Claude Code](https://docs.claude.com/en/docs/claude-code) and/or [Codex CLI](https://github.com/openai/codex) installed and logged in.
-- For the voice line, either a [Gemini API key](https://aistudio.google.com/apikey) (easiest) or a Google Cloud project with Vertex AI and Application Default Credentials (`gcloud auth application-default login`). Without either, everything works except voice.
-- `tools/cloudflared.exe` ([Cloudflare Tunnel client](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)) for the private Quest link.
-- Meta Quest 3 (Quest Browser). A desktop browser works as a preview.
+- A **Windows 10 or 11 PC**. The agents' terminals use Windows ConPTY, so macOS and Linux are not supported yet.
+- **Python 3.12 or newer** ([python.org](https://www.python.org/downloads/); tick "Add python.exe to PATH" in the installer).
+- At least one coding agent, installed and logged in: [Claude Code](https://docs.claude.com/en/docs/claude-code) (a Claude subscription or API key) and/or [OpenAI Codex CLI](https://github.com/openai/codex) (a ChatGPT plan or API key). The agents run on your own accounts; Brick Office never sees those logins.
+- For voice (optional): a free [Gemini API key](https://aistudio.google.com/apikey), or a Google Cloud project with Vertex AI and Application Default Credentials. Without either, everything works except talking to the agents.
+- A **Meta Quest 3** with Quest Browser. No headset? The office also runs in a desktop browser as a preview.
 
-## Start
+## Setup (first time)
 
-1. `pip install -r requirements.txt` and put `cloudflared.exe` in `tools/`. For voice, copy `.env.example` to `.env` and set `GEMINI_API_KEY`.
-2. Double-click `start-office.cmd`. The dashboard opens at http://localhost:8120. On first run `workers.json` is created with Clyde and Dex working in this folder; edit it or use **Hire a worker** on the dashboard to point them at your own projects.
-3. The first time an agent opens a folder, Claude/Codex asks whether to trust it. Answer on the dashboard (click the screen, use arrows and Enter) or by voice.
-4. **Quest:** click **Create Quest link** on the dashboard, open the link in Quest Browser and enter the six-digit code.
-5. In the headset: **1 · Enable voice & microphone**, then **2 · Enter the office (VR)**.
+1. **Get the code.** `git clone https://github.com/CostaYannakis/VROffice.git` (or download the ZIP from GitHub and unzip it), then open a terminal in that folder.
+2. **Install the Python packages.** `pip install -r requirements.txt`
+3. **Check your coding agents.** Run `claude` and/or `codex` once in a terminal and finish their login. They must start from any folder, because the office launches them by name.
+4. **Get the Quest link tool.** Download `cloudflared-windows-amd64.exe` from the [Cloudflare downloads page](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/), rename it to `cloudflared.exe` and put it in the `tools/` folder. No Cloudflare account is needed.
+5. **Turn on voice (optional).** Copy `.env.example` to `.env` and paste your key after `GEMINI_API_KEY=`.
+6. **Start the office.** Double-click `start-office.cmd`. The dashboard opens at http://localhost:8120.
+   - On first run `workers.json` is created with two agents, Clyde (Claude Code) and Dex (Codex), both working in this folder, so they can build the office itself. Use **Hire a worker** on the dashboard (or `tools/onboard.py`, below) to point agents at your own projects.
+   - The first time an agent opens a folder, Claude/Codex asks whether to trust it. Answer on the dashboard: click the agent's screen, then use the arrow keys and Enter.
+7. **Connect the headset.** Click **Create Quest link** on the dashboard. Open the link in Quest Browser on the headset and type the six-digit code shown on the dashboard.
+8. **Go in.** In the headset tap **1 · Enable voice & microphone** (allow the microphone), then **2 · Enter the office (VR)**. Walk up to an agent, look at them and say hello.
 
-Desktop preview without a headset: http://localhost:8120/office.html.
+Desktop preview without a headset: http://localhost:8120/office.html (double-click an agent to talk).
 
-Optional `.env` in this folder (see `.env.example`): `GEMINI_API_KEY` (or `GOOGLE_API_KEY`), `OFFICE_PORT`, `OFFICE_GOOGLE_PROJECT` (Vertex AI; defaults to your ADC project), `OFFICE_GOOGLE_LOCATION`, `OFFICE_VOICE_MODEL`, `OFFICE_SESSION_USD`, `OFFICE_DAILY_USD`, `OFFICE_SESSION_MINUTES`, `OFFICE_IDLE_SECONDS`.
+**Day to day:** double-click `start-office.cmd` to start (it does nothing if the office is already running), and use the dashboard's **Create Quest link** whenever you want the headset in. Run `restart-office.ps1` after changing `server.py` or `.env`; the headset reconnects by itself.
+
+All settings are optional and go in `.env` (see `.env.example`): `GEMINI_API_KEY` (or `GOOGLE_API_KEY`), `OFFICE_PORT`, `OFFICE_GOOGLE_PROJECT` (Vertex AI; defaults to your ADC project), `OFFICE_GOOGLE_LOCATION`, `OFFICE_VOICE_MODEL`, `OFFICE_SESSION_USD`, `OFFICE_DAILY_USD`, `OFFICE_SESSION_MINUTES`, `OFFICE_IDLE_SECONDS`.
+
+## Troubleshooting
+
+| Problem | Fix |
+| --- | --- |
+| "The office server did not start" | Read `data\server-error.log`. Usually a missing package (`pip install -r requirements.txt`) or port 8120 in use (set `OFFICE_PORT` in `.env`). |
+| An agent's desk says STOPPED, or "claude/codex is not on PATH" | Open a new terminal and check `claude` or `codex` starts there. Reinstall it or add it to PATH, then click **Restart** on that agent's card on the dashboard. |
+| "tools/cloudflared.exe is missing" | Step 4 above: the file must be named exactly `cloudflared.exe` and sit in `tools/`. |
+| "Cloudflare could not open the link" | Check your internet connection and `data\cloudflare.log`, then try **Create Quest link** again. |
+| The headset says the code is not valid | Codes last two hours. Click **New code** on the dashboard and use the new one. After five wrong tries, wait ten minutes. |
+| "Voice is off" | Set `GEMINI_API_KEY` in `.env` (step 5) and run `restart-office.ps1`. |
+| Agents talk but nothing happens in the terminal | The terminal is probably waiting on a trust or permission prompt. Look at the desk monitor or the dashboard and answer it. |
+| A mod I asked for does not appear | Check you are in the office it was built for (Enterprise or Sandbox). Errors from a broken mod show as a notice in the office. |
 
 ## Working with your agents
 
@@ -137,7 +157,7 @@ This gives a headset control over real terminals on your PC, so treat it like re
 
 ## Status
 
-Tested in the desktop preview and an emulated Quest 3 (IWER). Not yet tuned on every physical headset: expect to adjust movement speed, grab distances and gesture thresholds after a real session. Contributions welcome.
+An early release. Used on a Quest 3 and in desktop browsers, Windows only. Movement speed, grab distances and gesture thresholds may need tuning for your setup. Issues and contributions welcome.
 
 ## License
 
