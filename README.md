@@ -62,7 +62,7 @@ All settings are optional and go in `.env` (see `.env.example`): `GEMINI_API_KEY
 | An agent's desk says STOPPED, or "claude/codex is not on PATH" | Open a new terminal and check `claude` or `codex` starts there. Reinstall it or add it to PATH, then click **Restart** on that agent's card on the dashboard. |
 | "tools/cloudflared.exe is missing" | Step 4 above: the file must be named exactly `cloudflared.exe` and sit in `tools/`. |
 | "Cloudflare could not open the link" | Check your internet connection and `data\cloudflare.log`, then try **Create Quest link** again. |
-| The headset says the code is not valid | Codes last two hours. Click **New code** on the dashboard and use the new one. After five wrong tries, wait ten minutes. |
+| The headset says the code is not valid | Codes last two hours. Click **New code** on the dashboard and use the new one. After five wrong tries, wait ten minutes. To always use the same code, set `OFFICE_QUEST_CODE` in `.env` (keep it private). |
 | "Voice is off" | Set `GEMINI_API_KEY` in `.env` (step 5) and run `restart-office.ps1`. |
 | Agents talk but nothing happens in the terminal | The terminal is probably waiting on a trust or permission prompt. Look at the desk monitor or the dashboard and answer it. |
 | A mod I asked for does not appear | Check you are in the office it was built for (Enterprise or Sandbox). Errors from a broken mod show as a notice in the office. |

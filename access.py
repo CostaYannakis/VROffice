@@ -58,7 +58,12 @@ class QuestAccess:
         self.sessions, self.attempts = {}, {}
         self.starting = False
         self.state_file = root / 'data/access.json'
+        # OFFICE_QUEST_CODE in .env: a fixed six-digit pairing code that never expires (the attempt limit still applies)
+        fixed = os.getenv('OFFICE_QUEST_CODE', '').strip()
+        self.fixed_code = fixed if re.fullmatch(r'\d{6}', fixed) else None
         self.adopt()
+        if self.fixed_code and self.host:
+            self.renew()
 
     # ---- persistence: the tunnel outlives a server restart ----
     def tunnel_alive(self):
@@ -144,8 +149,8 @@ class QuestAccess:
         return result
 
     def renew(self):
-        self.code = f'{secrets.randbelow(1000000):06d}'
-        self.code_until = time.time() + 7200
+        self.code = self.fixed_code or f'{secrets.randbelow(1000000):06d}'
+        self.code_until = time.time() + (10 * 365 * 86400 if self.fixed_code else 7200)
         self.attempts = {}
         self.save()
 
