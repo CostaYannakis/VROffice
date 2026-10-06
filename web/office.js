@@ -151,7 +151,16 @@ $('pairForm').onsubmit = async e => {
     const r = await fetch('/api/pair', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: $('code').value }) });
     if (!r.ok) throw Error(await r.text());
     await boot();
-  } catch (error) { $('pairError').textContent = error.message; }
+  } catch (error) { $('pairError').textContent = error.message; $('code').value = ''; }
+};
+// On-screen number pad: Quest Browser's own keyboard does not always appear for the code box. Six digits connect.
+if ($('keypad')) $('keypad').onclick = e => {
+  const key = e.target.closest('button')?.dataset.key, input = $('code'); if (!key) return;
+  if (key === 'back') input.value = input.value.slice(0, -1);
+  else if (key === 'clear') input.value = '';
+  else if (input.value.length < 6) input.value += key;
+  if (key !== 'back' && key !== 'clear') $('pairError').textContent = '';
+  if (input.value.length === 6) $('pairForm').requestSubmit();
 };
 
 function listen() {

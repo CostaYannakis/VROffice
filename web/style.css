@@ -79,6 +79,10 @@ dialog h2 { margin-top: 0; }
 .office #pair { position: fixed; z-index: 4; inset: 0; display: grid; place-content: center; text-align: center; background: radial-gradient(ellipse at 50% 30%, #23384a, #0b1117 70%); }
 .office #pair[hidden] { display: none; }
 .office #pair input { width: 200px; font-size: 28px; letter-spacing: 6px; text-align: center; }
+/* on-screen number pad for the pairing code: big targets for a controller ray or a fingertip */
+.office #keypad { display: grid; grid-template-columns: repeat(3, 96px); gap: 12px; justify-content: center; margin: 22px auto 6px; }
+.office #keypad button { height: 76px; font-size: 32px; font-weight: 700; border-radius: 14px; }
+.office #keypad button.ghost { font-size: 20px; }
 .office .hint { position: fixed; z-index: 2; bottom: 14px; left: 0; right: 0; text-align: center; color: var(--muted); font-size: 12px; pointer-events: none; }
 @media (max-width: 700px) { .office .panel { top: auto; bottom: 12px; left: 12px; right: 12px; width: auto; max-height: 45vh; } }
 
