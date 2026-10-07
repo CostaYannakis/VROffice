@@ -34,6 +34,7 @@ from google.auth.transport.requests import Request
 
 import workers as roster
 from access import QuestAccess
+from speech import Speech
 from terminals import KEYS, Terminal
 
 ROOT = Path(__file__).resolve().parent
@@ -1174,6 +1175,16 @@ async def on_cleanup(app):
         task.cancel()
 
 
+def record_usd(usd):
+    if usd > 0:
+        db.execute('INSERT INTO usage(day,usd) VALUES (?,?)', (datetime.date.today().isoformat(), usd))
+        db.commit()
+
+
+# Text to speech for mods (POST /api/tts) and talking to a mod's character (POST /api/chat): see speech.py.
+speech = Speech(client, credentials, lambda: credentials.refresh(AuthRequest()), ROOT / 'data' / 'tts-cache',
+                over_limit=lambda: daily() >= DAILY_LIMIT, record=record_usd, off_reason=VOICE_OFF)
+
 app = web.Application(middlewares=[access.middleware], client_max_size=64000)
 app.router.add_get('/api/state', get_state)
 app.router.add_get('/api/projects', projects_api)
@@ -1192,6 +1203,8 @@ app.router.add_route('*', '/api/memory', memory_api)
 app.router.add_get('/api/term', term_socket)
 app.router.add_get('/api/events', events_socket)
 app.router.add_get('/api/live', live)
+app.router.add_post('/api/tts', speech.handle)
+app.router.add_post('/api/chat', speech.chat)
 app.router.add_post('/api/pair', access.pair)
 app.router.add_get('/api/quest/state', access.status)
 app.router.add_post('/api/quest/start', access.start)
