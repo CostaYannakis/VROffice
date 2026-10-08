@@ -101,7 +101,7 @@ Offboarding never touches the agent's project folder, and keeps its history unle
 
 | Action | Controllers | Hand tracking |
 | --- | --- | --- |
-| Move | Left thumbstick (the way you look) | Teleport |
+| Move | Left thumbstick (the way you look) | Swim: pull open hands back (palms leading) to glide forward, push them forward to drift back, sweep sideways to slide. Or teleport |
 | Turn | Right thumbstick left/right (30° snap) | Wrist menu → TURN LEFT / TURN RIGHT |
 | Teleport | Push the right stick forward to aim, release to jump | Pinch while pointing at the floor, release to jump |
 | Wrist menu | Follows the left controller; aim the right ray and pull the trigger | Turn your left palm towards your face; poke with your right index finger |
