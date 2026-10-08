@@ -4,8 +4,9 @@
 // told you about show as target rings on his skin, filling in as they melt.
 // Adjustments, the focus: a few of his vertebrae (T1-T12, L1-L5) are stuck. Two palm prints on his skin mark the next
 // one: both palms there either side of the spine, press in, then one quick push up towards his head (or straight down)
-// and the level pops. A single heel of the hand beside the spine, timed to his breath out, still works too, and both
-// palms swept down the back crack it level by level. His neck, both sides: hold his head or neck (one hand or both, the
+// and the level pops. With no feel of his skin, colour shows your pressure: a ring round each hand on his back
+// (blue light, green good, amber firm, red too hard) and the prints fill green when a heel is on and pressing right.
+// A single heel of the hand beside the spine, timed to his breath out, still works too, and both palms swept down the back crack it level by level. His neck, both sides: hold his head or neck (one hand or both, the
 // ghost hands show where) and give it a quick small twist. Tight muscles guard a joint (massage them first); too hard,
 // too rough, too far: he tells you. A joint that has just gone will not go again soon.
 // He remembers the session (what hurt, what cracked, what tickled) and his lines draw on it. The console by his head:
@@ -18,7 +19,9 @@ import { skinMaps, skinMaterial } from './massage-parts/skin.js';
 import { buildHead } from './massage-parts/head.js';
 import { loft, armGeometry, calfGeometry, footParts } from './massage-parts/limbs.js';
 import { loadHand, SkinnedHand, curledPose, JOINTS as HAND_JOINTS, CHAINS as HAND_CHAINS } from './massage-parts/hands.js';
-import { SANDBOX_ROOM } from '../../environment.js';
+import { RagdollClient } from './massage-parts/ragdoll.js';
+import { createChannel } from './massage-parts/channel.js';
+import { TABLE, inClinic } from './massage-parts/clinic-layout.js';
 
 const PAD = .74;                                   // table top (pad surface) height
 const SKIN = '#d39f7e', HAIR = '#3a2a1e', FLUSH = '#d9725f';
@@ -131,7 +134,7 @@ const TECH = {
 const PRESS_DEPTH = .045;                          // metres of push that read as pressure 1 (top of 'good'); was .03, too touchy
 const pressureFit = p => p < .12 ? .15 : p < .3 ? .55 : p <= .95 ? 1 : p <= 1.3 ? .75 : 0;
 
-const NAMES = ['Gus', 'Marty', 'Theo', 'Ray', 'Hugo', 'Sal'];
+const NAMES = ['Gus', 'Marty', 'Theo', 'Ray', 'Hugo', 'Sal'], FEMALE_NAMES = ['Mia', 'Ava', 'Zoe', 'Ella', 'Ruby', 'Isla'];
 const STORIES = [
   { why: 'Quarter end. Twelve hour days hunched over spreadsheets. My mid back feels locked solid.', knots: ['traps.R', 'mid'], stuck: ['T5', 'T7', 'T9'] },
   { why: 'I helped my brother carry a sofa up four flights of stairs. He lives on the fourth floor. Of course he does.', knots: ['lower.R', 'lat.L'], stuck: ['T6', 'T11', 'L2'] },
@@ -181,6 +184,10 @@ const LINES = {
   neckStretch: ['Mm, that is a stretch.', "Okay, that's about as far as it turns."],
   neckCrack: ['Ohhh, that was a crunchy one.', 'Whoa. I heard that in my ears.', 'Oh, my neck feels a mile long.', 'Oh wow. That was so satisfying.',
     'Ohhh... did you hear that? Pure bliss.'],
+  poseFaceUp: ['Rolling over... okay, on my back.', 'Onto my back? Sure.'],
+  poseSitting: ['Sitting up. Whoa, little head rush.', 'Okay, sitting up.'],
+  poseFaceDown: ['Back on my front. Face in the hole.', 'Lying back down.'],
+  stretchFar: ["Ow, ow! That's as far as it goes!", "Easy! My joints don't bend that far.", 'Ah! Too far, too far.'],
   neckTense: ["I'm still holding my neck. Rock my head gently side to side first.", "Not yet, I'm guarding. Slow little rocks, let me let go."],
   neckLetGo: ["Mmm... okay. I'm letting go. It's all yours.", 'Ohh, that rocking... my neck has gone all floppy.'],
   neckReady: ['Okay... breathing out...', "Mm. That's the end. Ready when you are."],
@@ -227,11 +234,12 @@ const MEMORY_OF = {
 };
 const FAILED_TRY = new Set(['guarded', 'early', 'nothing', 'force', 'bone', 'ribs', 'kidney', 'again', 'lean']);
 // Each client has his own Gemini voice; STYLES tell the voice how to say a line, MOOD_OF which style each bank of lines uses.
-const VOICE_OF = { Gus: 'Enceladus', Marty: 'Algenib', Theo: 'Achird', Ray: 'Charon', Hugo: 'Orus', Sal: 'Fenrir' };
+const VOICE_OF = { Gus: 'Enceladus', Marty: 'Algenib', Theo: 'Achird', Ray: 'Charon', Hugo: 'Orus', Sal: 'Fenrir',
+  Mia: 'Aoede', Ava: 'Kore', Zoe: 'Leda', Ella: 'Zephyr', Ruby: 'Despina', Isla: 'Callirrhoe' };
 const STYLES = {
-  chat: 'Say in a relaxed, slightly muffled voice, like a man lying face down on a massage table',
-  greet: 'Say in a friendly, slightly tired voice, like a man lying face down on a massage table chatting to his therapist',
-  bliss: 'Say in a drowsy, blissed-out murmur, like a man getting a great massage',
+  chat: 'Say in a relaxed, slightly muffled voice, like a person lying on a massage table',
+  greet: 'Say in a friendly, slightly tired voice, like a person lying on a massage table chatting to their therapist',
+  bliss: 'Say in a drowsy, blissed-out murmur, like someone getting a great massage',
   pain: 'Say with a sudden yelp of pain, wincing',
   laugh: 'Say while laughing helplessly, because it tickles',
   firm: 'Say firmly but good-naturedly',
@@ -245,7 +253,7 @@ const MOOD_OF = new Map([['found', 'bliss'], ['working', 'bliss'], ['released', 
   ['cueIn', 'breath'], ['cueOut', 'breath'], ['crack', 'bliss'], ['little', 'chat'], ['nothing', 'chat'], ['bone', 'pain'], ['ribs', 'firm'], ['kidney', 'pain'],
   ['early', 'chat'], ['guarded', 'chat'], ['again', 'chat'], ['force', 'pain'], ['lumbar', 'firm'], ['slack', 'chat'], ['lean', 'guide'], ['sweep', 'bliss'],
   ['neckHold', 'chat'], ['neckStretch', 'chat'], ['neckCrack', 'bliss'], ['neckOther', 'guide'], ['neckFar', 'pain'], ['neckRough', 'pain'], ['neckGuard', 'chat'],
-  ['neckPoke', 'firm'], ['segNext', 'chat'], ['neckAsk', 'chat'], ['neckTense', 'chat'], ['neckLetGo', 'bliss'], ['neckReady', 'breath'],
+  ['neckPoke', 'firm'], ['segNext', 'chat'], ['neckAsk', 'chat'], ['neckTense', 'chat'], ['poseFaceUp', 'chat'], ['poseSitting', 'chat'], ['poseFaceDown', 'chat'], ['stretchFar', 'pain'], ['neckLetGo', 'bliss'], ['neckReady', 'breath'],
   ['owAgain', 'pain'], ['slapAgain', 'firm'], ['tickleAgain', 'laugh'], ['crackAtLast', 'bliss'], ['wary', 'firm'], ['backMid', 'chat'], ['wakeDream', 'groggy']]
   .map(([k, mood]) => [LINES[k], mood]).concat(Object.values(LINES.tech).map(list => [list, 'bliss'])));
 const BANK_OF = new Map(Object.entries(LINES).filter(([, v]) => Array.isArray(v)).map(([k, v]) => [v, k]));
@@ -266,7 +274,7 @@ export default function (ctx) {
   const { THREE } = ctx;
   const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
   const root = new THREE.Group(); root.name = 'massage-simulator';
-  ctx.add(root, { at: [0, 0, -1.45] });
+  ctx.add(root, { at: [TABLE.x, 0, TABLE.z] });       // in its own room, the clinic (clinic-room.js)
   const body = new THREE.Group(); body.position.y = PAD; root.add(body);
   const textures = [];
   const maps = skinMaps(512, 3); ctx.onCleanup(() => maps.dispose());     // pores, fine lines, mottling: see massage-parts/skin.js
@@ -438,12 +446,55 @@ export default function (ctx) {
     towel.frustumCulled = false; body.add(towel);
   }
 
+  // ---------- the client as a rag doll (massage-parts/ragdoll.js): the rigged body you see, in a pose, limbs you can move ----------
+  // The sculpted body above stays as the invisible surface the massage reads face down, lifted to line up with the middle
+  // of the client's back. Lying face up or sitting, the massage surface is off until it is rebuilt on the new bodies.
+  const oldBody = [...body.children];
+  let client = null, clientKind = null, clientLoading = null, bodyLift = 0;
+  const prone = () => !client || (client.pose === 'faceDown' && !client.moving);
+  async function useClient(kind) {
+    if (clientKind === kind && (client || clientLoading)) { client?.setPose('faceDown', client.pose === 'faceDown' ? 0 : 1.6); return; }
+    clientKind = kind; const load = clientLoading = RagdollClient.create(kind, { pad: PAD });
+    let next; try { next = await load; } catch (error) { console.warn('massage: client model', error); clientLoading = null; return; }
+    if (disposed || load !== clientLoading) { next.dispose(); return; }
+    clientLoading = null; client?.dispose(); client = next; root.add(client.group);
+    for (const o of oldBody) o.traverse(m => { if (m.isMesh) m.visible = false; });
+    bodyLift = client.group.position.y + client.depth.midBack - (PAD + restTop(.3, 0).y);
+    showPose(); boardDirty = true;
+  }
+  ctx.onCleanup(() => { client?.dispose(); });
+  root.userData.ragdoll = { client: () => client, setPose: n => setPose(n), useClient };   // for poking at from the console
+  const POSE_ORDER = ['faceDown', 'faceUp', 'sitting'], POSE_LABEL = { faceDown: 'FACE DOWN', faceUp: 'FACE UP', sitting: 'SITTING UP' };
+  const POSE_LINES = { faceDown: 'poseFaceDown', faceUp: 'poseFaceUp', sitting: 'poseSitting' };
+  function setPose(name) {
+    if (!client || client.pose === name && !client.moving) return;
+    client.releaseAll(); brain.grip = null;
+    client.setPose(name); showPose();
+    say(pick(LINES[POSE_LINES[name]]), { urgent: true }); remember('pose', `I ${name === 'faceUp' ? 'rolled onto my back' : name === 'sitting' ? 'sat up on the edge of the table' : 'lay back down on my front'}`);
+  }
+
   // ---------- speech bubble and status board ----------
   const bubbleCanvas = document.createElement('canvas'); bubbleCanvas.width = 512; bubbleCanvas.height = 220;
   const bubbleTex = new THREE.CanvasTexture(bubbleCanvas); bubbleTex.colorSpace = THREE.SRGBColorSpace; textures.push(bubbleTex);
   const bubble = new THREE.Mesh(new THREE.PlaneGeometry(.46, .46 * 220 / 512), new THREE.MeshBasicMaterial({ map: bubbleTex, transparent: true, toneMapped: false, side: THREE.DoubleSide, depthWrite: false }));
   bubble.visible = false; bubble.renderOrder = 3; root.add(bubble);
   let bubbleText = '';
+  // a small tag under the bubble while you talk to him: listening, hearing you, thinking, then what he heard you say
+  const pillCanvas = document.createElement('canvas'); pillCanvas.width = 768; pillCanvas.height = 96;
+  const pillTex = new THREE.CanvasTexture(pillCanvas); pillTex.colorSpace = THREE.SRGBColorSpace; textures.push(pillTex);
+  const pill = new THREE.Mesh(new THREE.PlaneGeometry(.4, .05), new THREE.MeshBasicMaterial({ map: pillTex, transparent: true, toneMapped: false, side: THREE.DoubleSide, depthWrite: false }));
+  pill.visible = false; pill.renderOrder = 3; root.add(pill);
+  let pillDrawn = '';
+  function drawPill(text, color) {
+    if (text + color === pillDrawn) return; pillDrawn = text + color;
+    const g = pillCanvas.getContext('2d'); g.clearRect(0, 0, 768, 96);
+    g.font = 'bold 40px system-ui, sans-serif'; let t = text; while (g.measureText(t).width > 680 && t.length > 4) t = t.slice(0, -2);
+    if (t !== text) t = t.slice(0, -1) + '…';
+    const w = Math.min(760, g.measureText(t).width + 56);
+    g.fillStyle = 'rgba(29,35,43,.88)'; g.beginPath(); g.roundRect((768 - w) / 2, 6, w, 84, 42); g.fill();
+    g.fillStyle = color; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(t, 384, 50);
+    pillTex.needsUpdate = true;
+  }
   function drawBubble(text) {
     if (text === bubbleText) return; bubbleText = text;
     const g = bubbleCanvas.getContext('2d'); g.clearRect(0, 0, 512, 220);
@@ -472,6 +523,15 @@ export default function (ctx) {
   const button = new THREE.Mesh(new THREE.CylinderGeometry(.055, .06, .04, 24), plastic('#e04f3d', .3)); button.position.y = .9; plinth.add(button);
   const sign = ctx.label('NEW CLIENT', { width: .26 }); sign.position.set(0, 1.03, 0); plinth.add(sign);
   let buttonDown = 0, buttonCool = 0;
+  // POSE: face down, face up, sitting on the edge, in turn
+  const posePlinth = new THREE.Group(); posePlinth.position.set(1.22, 0, .12); root.add(posePlinth);
+  posePlinth.add(ctx.brick(.16, .88, .16, '#2b3644', { studs: false }));
+  const poseButton = new THREE.Mesh(new THREE.CylinderGeometry(.055, .06, .04, 24), plastic('#8e5bd6', .3)); poseButton.position.y = .9; posePlinth.add(poseButton);
+  const poseSigns = Object.fromEntries(['faceDown', 'faceUp', 'sitting'].map(n => [n, ctx.label(`POSE: ${({ faceDown: 'FACE DOWN', faceUp: 'FACE UP', sitting: 'SITTING' })[n]}`, { width: .3 })]));
+  for (const sgn of Object.values(poseSigns)) { sgn.position.set(0, 1.03, 0); sgn.visible = false; posePlinth.add(sgn); }
+  function showPose() { const now = client?.trans?.name || client?.pose || 'faceDown'; for (const [n, sgn] of Object.entries(poseSigns)) sgn.visible = n === now; }
+  showPose();
+  let poseButtonDown = 0, poseCool = 0;
   // the console at the head end, on your side. VOICE: green when he talks out loud, grey when muted (the bubble still
   // shows his words). TALK: blue while he is listening to you (see 'talking to him' below), grey when not.
   const voicePlinth = new THREE.Group(); voicePlinth.position.set(-1.3, 0, .42); root.add(voicePlinth);
@@ -656,6 +716,7 @@ export default function (ctx) {
     speakingUntil = Math.max(speakingUntil, time + (voiceNext - ac.currentTime) + .15); bubbleUntil = Math.max(bubbleUntil, speakingUntil + 1);
   }
   function stopVoice() {
+    liveFlush();
     for (const src of voiceSources) { try { src.stop(); } catch {} }
     voiceSources = []; voiceNext = 0; cloudLine = null;
     voiceAbort?.abort(); voiceAbort = null;      // the server still finishes and caches the line
@@ -742,11 +803,13 @@ export default function (ctx) {
     const bank = pendingBank; pendingBank = null;
     if (bank && MEMORY_OF[bank]) remember(bank, MEMORY_OF[bank]);           // it happened, whether or not he gets to say so
     if (speaking() && !urgent) return false;
+    if (!urgent && (chat.state === 'hearing' || chat.busy)) return false;     // you are talking to him: no chatter over you
     if (sfx) sound(sfx);
     stopVoice();
     const id = ++lineId;
     brain.lastSpoke = time; speechDone = false;
     const said = brain.memory.said; said.push(text); if (said.length > 10) said.shift();
+    liveContext(`you said: "${text}"`);
     const estimate = .6 + text.split(/\s+/).length * .34;
     speakingUntil = time + estimate * 1.8; bubbleUntil = speakingUntil; drawBubble(text);
     if (muted) { speakingUntil = time + estimate; bubbleUntil = speakingUntil + 1.2; return true; }    // read it in the bubble
@@ -770,6 +833,20 @@ export default function (ctx) {
     env.gain.setValueAtTime(.12, t); env.gain.exponentialRampToValueAtTime(.0005, t + .07);
     osc.connect(env).connect(ac.destination); osc.start(t); osc.stop(t + .08);
   }
+  // a little jingle for the channel: a crack landing, a big one, the video posting
+  function chime(kind) {
+    if (!audio()) return;
+    const notes = kind === 'post' ? [523, 659, 784, 1047] : kind === 'big' ? [784, 988, 1175, 1568] : [880, 1175];
+    notes.forEach((f, i) => {
+      const t = ac.currentTime + .05 + i * .085, osc = ac.createOscillator(), env = ac.createGain();
+      osc.type = 'triangle'; osc.frequency.value = f;
+      env.gain.setValueAtTime(.0005, t); env.gain.exponentialRampToValueAtTime(.09, t + .01); env.gain.exponentialRampToValueAtTime(.0005, t + .22);
+      osc.connect(env).connect(ac.destination); osc.start(t); osc.stop(t + .25);
+    });
+  }
+  // the clinic's video channel (massage-parts/channel.js): every client is a video, cracks are the views
+  const channel = createChannel({ ctx, root, plastic, roundBox, textures, chime });
+  root.userData.channel = channel;
   function vocal(name, hold = 1) { if (speaking()) return; sound(name); drawBubble(SOUND_TEXT[name]); bubbleUntil = Math.max(bubbleUntil, time + hold); }
   function queue(text, delay = 0, mood = null) { brain.queue.push({ text, at: time + delay, mood: mood || pendingMood }); pendingMood = null; pendingBank = null; }
   function known(key) { if (brain.tension[key] != null) brain.known.add(key); }
@@ -786,6 +863,7 @@ export default function (ctx) {
     m.count[kind] = (m.count[kind] || 0) + 1;
     if (zone) { const z = m.zones[zone] ||= {}; z[kind] = (z[kind] || 0) + 1; }
     if (FAILED_TRY.has(kind)) m.tries++;
+    if (kind !== 'youSaid') liveContext(text);
   }
   const tally = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
   const clock = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -828,9 +906,11 @@ export default function (ctx) {
   }
 
   function newClient(first = false) {
+    if (!first) { channel.post(); brain.postAt = 0; }
     const story = STORIES[Math.floor(Math.random() * STORIES.length)];
-    let name = first ? 'Gus' : NAMES[Math.floor(Math.random() * NAMES.length)];
-    if (!first && name === brain.name) name = NAMES[(NAMES.indexOf(name) + 1) % NAMES.length];
+    const kind = first ? 'female' : clientKind === 'female' ? 'male' : 'female', names = kind === 'female' ? FEMALE_NAMES : NAMES;
+    let name = first ? 'Mia' : names[Math.floor(Math.random() * names.length)];
+    if (!first && name === brain.name) name = names[(names.indexOf(name) + 1) % names.length];
     const tension = {};
     for (const [z, info] of Object.entries(ZONES)) if (!info.loose) for (const key of info.both ? [z] : [z + '.L', z + '.R']) tension[key] = rand(.3, .45);
     const knots = story.knots.map(key => {
@@ -840,7 +920,7 @@ export default function (ctx) {
       return { key, u, n, x: X0 + u * LEN, z: n * profile(u)[0], need: rand(7, 10), progress: 0, found: false, done: false };
     });
     Object.assign(brain, {
-      name, voice: VOICE_OF[name] || 'Enceladus', story, tension, knots, known: new Set(), relax: .1, trust: 1, phase: 'waiting', queue: [], lastSpoke: -99, lastTouch: time,
+      name, kind, voice: VOICE_OF[name] || 'Enceladus', story, tension, knots, known: new Set(), relax: .1, trust: 1, phase: 'waiting', queue: [], lastSpoke: -99, lastTouch: time,
       lastGuide: -99, lastPraise: time, lastLight: -99, lastPain: -99, lastSpine: -99, lastTickle: -99, lastFeet: -99, lastTowel: -99,
       lastHead: -99, lastArm: -99, lastSlap: -99, offKnot: 0, light: 0, tickle: 0, headTime: 0, nextKnotSound: 0, halfSaid: false,
       awayTime: 0, away: false, doneAt: 0, nextSnore: 0, techSaid: new Set(), techTime: 0, techLast: '',
@@ -854,6 +934,7 @@ export default function (ctx) {
     brain.queue.length = 0; dent.fill(0); warmth.fill(0); dragX.fill(0); dragZ.fill(0); twitches.length = 0;
     if (!first) { speechDone = true; speakingUntil = 0; stopVoice(); }
     if (cloud.ok !== false) prefetchClient();
+    useClient(kind);
     boardDirty = true;
   }
   const focusKnot = () => brain.knots.find(k => !k.done) || null;
@@ -868,7 +949,7 @@ export default function (ctx) {
   }
   function greet(touched) {
     if (brain.phase !== 'waiting') return;
-    brain.phase = 'massage';
+    brain.phase = 'massage'; channel.start(brain.name);
     remember('arrived', `I lay down and told them why I came in: ${brain.story.why}`);
     greetLines(touched).forEach(([text, mood], i) => queue(text, [0, .4, .4, .6, .6][i], mood));
     known(focusKnot().key); const seg = focusSeg(); if (seg) seg.known = true;
@@ -902,6 +983,7 @@ export default function (ctx) {
   const segDist = (p, a, b) => { const ab = b.clone().sub(a), t = clamp(p.clone().sub(a).dot(ab) / ab.lengthSq(), 0, 1); return p.distanceTo(a.clone().addScaledVector(ab, t)); };
   const dynY = (u, n, w) => w * (brain.breath * gauss(u, .4, .35) + (n > 0 ? brain.hunchL : brain.hunchR) * gauss(Math.abs(n), .45, .25) * gauss(u, 0, .09));
   function hit({ p, r, kind }) {
+    if (!prone()) return null;
     if (p.y < -.03 || p.y > .45) return null;
     const u = (p.x - X0) / LEN;
     if (u > U_LO + .02 && u < U_TOWEL) {
@@ -1000,6 +1082,7 @@ export default function (ctx) {
   }
   // How far a body-local point of radius r may sit before it would show through: push it back onto the surface.
   function onSurface(p, r) {
+    if (!prone()) return;
     const u = (p.x - X0) / LEN;
     if (u > U_LO + .02 && u < U_TOWEL) {
       const W = profile(u)[0];
@@ -1019,7 +1102,7 @@ export default function (ctx) {
   const userHands = {};
   for (const side of ['left', 'right']) loadHand(side).then(gltf => {
     if (disposed) return;
-    const material = skinMaterial(maps, { color: '#dcaa8a' });
+    const material = skinMaterial(maps, { color: '#dcaa8a' }); material.side = THREE.DoubleSide;   // a tight fold never shows as a hole
     const hand = new SkinnedHand(gltf, material); hand.root.visible = false; root.add(hand.root);
     hand.root.traverse(o => { o.frustumCulled = false; });
     const arm = forearm(material); arm.visible = false; root.add(arm);
@@ -1034,22 +1117,48 @@ export default function (ctx) {
     for (const n of HAND_JOINTS) { const space = source.hand.get(n), pose = space && frame.getJointPose(space, ref); if (!pose) return null; out.push(pose.transform); }
     return out;
   }
-  const rootQ = new THREE.Quaternion(), fixQ = new THREE.Quaternion(), d0 = V(), d1 = V();
+  const rootQ = new THREE.Quaternion(), turnQ = new THREE.Quaternion(), d0 = V(), d1 = V(), axisV = V(), probe = V();
   const ARM_TURN = new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), Math.PI / 2);     // the forearm's +y onto the wrist's +z
+  // The joints that carry the hand's weight: wrist, palm (metacarpals) and knuckles. If any would sink in, the whole hand lifts.
+  const CORE = new Set(['wrist', ...HAND_JOINTS.filter(n => n.endsWith('metacarpal') || (n.endsWith('phalanx-proximal') && !n.startsWith('thumb')))]);
+  // How far a hand joint (in table space) must move to sit on his surface, as a table-space vector; null if it is clear.
+  function pushOut(p, r) {
+    const b = body.worldToLocal(root.localToWorld(probe.copy(p))), before = b.clone();
+    onSurface(b, r);
+    if (b.distanceToSquared(before) < 1e-10) return null;
+    return root.worldToLocal(body.localToWorld(b.clone())).sub(p);   // a new vector: callers keep it while probing other joints
+  }
+  // Your hand stays rigid: bone lengths never change, so the skinned model never stretches, squashes or tears. It is placed
+  // exactly as tracked, then (1) lifted as a whole until the palm rests on his skin (which still gives about 3 cm), and
+  // (2) any finger that would still go in bends back at its knuckle instead of stretching.
   function poseUserHand(u, transforms, res) {
     root.getWorldQuaternion(rootQ).invert();
     HAND_JOINTS.forEach((n, i) => {
-      const t = transforms[i], raw = u.raw.get(n).set(t.position.x, t.position.y, t.position.z), j = u.pose.get(n);
-      const p = body.worldToLocal(j.p.copy(raw)); onSurface(p, jointRadius(n)); root.worldToLocal(body.localToWorld(p));
-      root.worldToLocal(raw);
+      const t = transforms[i], j = u.pose.get(n);
+      root.worldToLocal(j.p.set(t.position.x, t.position.y, t.position.z));
       j.q.set(t.orientation.x, t.orientation.y, t.orientation.z, t.orientation.w).premultiply(rootQ);
     });
-    for (const chain of HAND_CHAINS) for (let i = 1; i < chain.length - 1; i++) {   // keep each bone pointing at the next joint once lifted onto the skin
-      const a = chain[i], b = chain[i + 1];
-      d0.subVectors(u.raw.get(b), u.raw.get(a)); d1.subVectors(u.pose.get(b).p, u.pose.get(a).p);
-      if (d0.lengthSq() < 1e-8 || d1.lengthSq() < 1e-8) continue;
-      fixQ.setFromUnitVectors(d0.normalize(), d1.normalize()); u.pose.get(a).q.premultiply(fixQ);
+    const shift = v => { for (const j of u.pose.values()) j.p.add(v); };
+    for (let pass = 0; pass < 3; pass++) {                       // (1) lift the whole hand onto the surface
+      let lift = null;
+      for (const n of CORE) { const d = pushOut(u.pose.get(n).p, jointRadius(n)); if (d && (!lift || d.lengthSq() > lift.lengthSq())) lift = d; }
+      if (!lift) break; shift(lift);
     }
+    for (const chain of HAND_CHAINS) {                           // (2) bend each finger back at its knuckle
+      const pivot = u.pose.get(chain[2]).p, tail = chain.slice(3);
+      for (let pass = 0; pass < 3; pass++) {
+        let worst = null, worstJ = null;
+        for (const n of tail) { const d = pushOut(u.pose.get(n).p, jointRadius(n)); if (d && (!worst || d.lengthSq() > worst.lengthSq())) { worst = d; worstJ = n; } }
+        if (!worst) break;
+        d0.subVectors(u.pose.get(worstJ).p, pivot); const reach = d0.length(); if (reach < 1e-4) break;
+        axisV.crossVectors(d0, worst); if (axisV.lengthSq() < 1e-12) break; axisV.normalize();
+        turnQ.setFromAxisAngle(axisV, Math.min(1.1, worst.length() / reach));
+        for (const n of tail) { const j = u.pose.get(n); j.p.sub(pivot).applyQuaternion(turnQ).add(pivot); j.q.premultiply(turnQ); }
+      }
+    }
+    let rest = null;                                             // a finger bent as far as it goes: lift the hand the rest of the way
+    for (const n of HAND_JOINTS) { const d = pushOut(u.pose.get(n).p, jointRadius(n)); if (d && (!rest || d.lengthSq() > rest.lengthSq())) rest = d; }
+    if (rest) shift(rest);
     u.hand.setPose(u.pose); u.hand.root.visible = true;
     const w = u.pose.get('wrist');                        // forearm: the wrist joint's +z points back towards the elbow
     u.arm.position.copy(w.p); u.arm.quaternion.copy(w.q).multiply(ARM_TURN); u.arm.visible = true;
@@ -1091,7 +1200,7 @@ export default function (ctx) {
   // ---------- reactions ----------
   const twitches = [];
   function twitch(x, z, amp = .006) { twitches.push({ x, z, amp, t0: time }); if (twitches.length > 6) twitches.shift(); }
-  function pain(level = 1) { brain.flinch = Math.max(brain.flinch, level); brain.ouchUntil = time + .9 + level * .4; }
+  function pain(level = 1) { brain.flinch = Math.max(brain.flinch, level); brain.ouchUntil = time + .9 + level * .4; if (level >= .5) channel.ouch(); }
 
   function work(res, dt) {
     const fit = pressureFit(res.p), T = TECH[res.tech], zone = zoneAt(res.u, res.n), eff = fit * T.zone;
@@ -1124,7 +1233,7 @@ export default function (ctx) {
   function release(k) {
     k.done = true; brain.tension[k.key] = .08; brain.relax = Math.min(1, brain.relax + .15); brain.melt = 1; brain.wiggle = 1.5;
     remember('knotGone', `they worked the knot ${zoneSay(k.key)} until it let go`, { zone: k.key });
-    sound('sigh'); say(pick(LINES.released), { urgent: true });
+    sound('sigh'); say(pick(LINES.released), { urgent: true }); channel.event('knot');
     const next = focusKnot();
     if (next) { known(next.key); queue(pick(LINES.next, next.key), 1.5); }
     boardDirty = true;
@@ -1147,6 +1256,7 @@ export default function (ctx) {
     brain.phase = 'done'; brain.doneAt = time; brain.relax = Math.max(brain.relax, .85); queue(pick(LINES.done), 2); boardDirty = true;
     const recap = recapLine(); if (recap) queue(recap, 2.5, 'bliss');
     remember('done', 'we finished the session: everything is worked out');
+    brain.postAt = time + 7;
   }
   function afterCrack() {
     const next = focusSeg();
@@ -1154,11 +1264,14 @@ export default function (ctx) {
     else if (neckLeft().length === 2 && !brain.neckAsked) { brain.neckAsked = true; queue(pick(LINES.neckAsk), 2.2); }
     finished(); boardDirty = true;
   }
-  function crackSegment(seg, { bilateral = false, quiet = false, weak = false } = {}) {
-    const big = seg.stuck && !seg.cracked, pops = big ? (weak ? 1 : 2 + (bilateral ? 2 : 1) + Math.floor(Math.random() * 2)) : Math.random() < (weak ? .2 : .35) ? 1 : 0;
+  // how: what went into it, for the channel ({ pressure, held, breath }: in the green, a steady hold, on his breath out)
+  function crackSegment(seg, { bilateral = false, quiet = false, weak = false, how = {} } = {}) {
+    const big = seg.stuck && !seg.cracked;      // a relaxed client lets go with a longer run of pops
+    const pops = big ? (weak ? 1 : 2 + (bilateral ? 2 : 1) + Math.floor(Math.random() * 2) + Math.round(brain.relax * 3)) : Math.random() < (weak ? .2 : .35) ? 1 : 0;
     seg.until = time + 45; brain.lastAdjust = time;
     if (!pops) { if (!quiet) say(pick(LINES.nothing), { urgent: true }); return false; }
     crackSound(body.localToWorld(V(seg.x, .17, 0)), pops, { big });
+    channel.crack({ pops, big: big && !weak, label: seg.name, relax: brain.relax, at: root.worldToLocal(body.localToWorld(V(seg.x, .17, 0))), ...how });
     twitch(seg.x, 0, big ? .012 : .006); brain.jolt = big ? 1 : .4; brain.wiggle = 1;
     if (big && !weak) {
       seg.cracked = seg.known = true;
@@ -1184,7 +1297,7 @@ export default function (ctx) {
     if (guarding(seg) > .62) { for (const z of [zoneAt(seg.u, .2), zoneAt(seg.u, -.2)]) known(z); say(pick(LINES.guarded), { urgent: true }); return; }
     if (seg.until > time) { say(pick(LINES.again), { urgent: true }); return; }
     if (i >= 12 && r.p > 1.3) { pain(.4); say(pick(LINES.lumbar), { urgent: true }); return; }
-    crackSegment(seg, { bilateral, weak: where === 'muscle' });
+    crackSegment(seg, { bilateral, weak: where === 'muscle', how: { pressure: true, held: true, breath: true } });
   }
   // A palm resting on his back: pre-load (press and hold beside the spine), then a quick short push on his breath out.
   function adjustSpine(results, dt) {
@@ -1229,7 +1342,7 @@ export default function (ctx) {
         for (let j = sw.last + 1; j <= i; j++) {
           const sj = brain.segments[j]; if (sj.until > time || sj.u > U_TOWEL) continue;
           if (sj.stuck && !sj.cracked && guarding(sj) > .62) { sj.until = time + 3; continue; }
-          if (crackSegment(sj, { quiet: true })) sw.cracked++;
+          if (crackSegment(sj, { quiet: true, how: { pressure: true } })) sw.cracked++;
           sw.count++;
         }
         sw.last = i;
@@ -1256,7 +1369,11 @@ export default function (ctx) {
     if (!st) st = brain.push = { since: time, seen: time, x, depth, armed: false };
     st.seen = time;
     const va = localVel(a.hand), vb = localVel(b.hand), up = -(va.x + vb.x) / 2, down = -(va.y + vb.y) / 2;
-    if (Math.abs(up) < .12 && Math.abs(down) < .12) { st.x = lerp(st.x, x, .3); st.depth = lerp(st.depth, depth, .3); }   // settled: the start of the push
+    if (Math.abs(up) < .12 && Math.abs(down) < .12) {                // settled: the start of the push
+      st.x = lerp(st.x, x, .3); st.depth = lerp(st.depth, depth, .3);
+      const green = a.p >= .3 && a.p < 1.3 && b.p >= .3 && b.p < 1.3;
+      if (!green) st.greenSince = null; else st.greenSince ??= time;
+    }
     if (time - st.since < .3) return true;                        // let the hands settle in first
     if (!st.armed) { st.armed = true; boardDirty = true; }
     brain.techLabel = 'Two-hand push';
@@ -1270,7 +1387,7 @@ export default function (ctx) {
     const seg = near.filter(s => s.stuck && !s.cracked && s.until <= time).sort((s, t) => Math.abs(s.x - at) - Math.abs(t.x - at))[0] || nearestSeg(at);
     if (seg.stuck && !seg.cracked && guarding(seg) > .75) { for (const z of [zoneAt(seg.u, .2), zoneAt(seg.u, -.2)]) known(z); say(pick(LINES.guarded), { urgent: true }); return true; }
     if (seg.until > time) { say(pick(LINES.again), { urgent: true }); return true; }
-    crackSegment(seg, { bilateral: true });
+    crackSegment(seg, { bilateral: true, how: { pressure: st.greenSince != null, held: st.greenSince != null && time - st.greenSince > 1, breath: exhaling() } });
     return true;
   }
   // The neck. Take hold of his head or neck, one hand or both (a light grip is enough), and give a quick small twist:
@@ -1363,7 +1480,9 @@ export default function (ctx) {
     if (side.until > time) { say(pick(LINES.again), { urgent: true }); return; }
     side.until = time + 45; brain.lastAdjust = time;
     const big = !side.cracked, loose = brain.neckRelax > .5 ? 2 : 0;    // a relaxed neck lets go with more
-    crackSound(headTurn.localToWorld(V(.09, 0, 0)), big ? 3 + loose + Math.floor(Math.random() * 4) : 1 + Math.floor(Math.random() * 2), { neck: true, big });
+    const pops = big ? 3 + loose + Math.floor(Math.random() * 4) : 1 + Math.floor(Math.random() * 2);
+    crackSound(headTurn.localToWorld(V(.09, 0, 0)), pops, { neck: true, big });
+    channel.crack({ pops, big, neck: true, label: `Neck, ${sideKey === 'L' ? 'left' : 'right'}`, relax: brain.relax, held: brain.neckRelax > .75, at: root.worldToLocal(headTurn.localToWorld(V())) });
     brain.snap = dir * (big ? .11 : .05); brain.jolt = big ? .7 : .3;
     if (big) {
       side.cracked = true; brain.relax = Math.min(1, brain.relax + .06); brain.melt = 1; brain.blissUntil = time + 4;
@@ -1397,7 +1516,7 @@ export default function (ctx) {
         say(n >= 2 ? pick(LINES.slapAgain, n) : pick(LINES.slap), { urgent: true, sfx: 'ow' }); continue;
       }
       if (r.part === 'towel' && r.onset && time - brain.lastTowel > 10) { brain.lastTowel = time; brain.flinch = Math.max(brain.flinch, .4); brain.trust = Math.max(0, brain.trust - .03); say(pick(LINES.towel), { urgent: true }); }
-      if (r.part === 'feet' && r.onset && time - brain.lastFeet > 6) { brain.lastFeet = time; brain.kick = 1; brain.laughUntil = time + 1.6; sound('giggle'); say(pick(LINES.feet), { urgent: true }); }
+      if (r.part === 'feet' && r.onset && time - brain.lastFeet > 6) { brain.lastFeet = time; brain.kick = 1; brain.laughUntil = time + 1.6; sound('giggle'); say(pick(LINES.feet), { urgent: true }); channel.event('laugh'); }
       if (r.part === 'arm' && r.onset && time - brain.lastArm > 30 && Math.random() < .5) { brain.lastArm = time; say(pick(LINES.arm)); }
       if (r.part === 'head' && !brain.grip) {
         brain.headTime += dt;
@@ -1428,7 +1547,7 @@ export default function (ctx) {
       }
       if (best.zone.startsWith('flank') && best.p < .3 && best.speed > .08) {
         brain.tickle += dt;
-        if (brain.tickle > .5 && time - brain.lastTickle > 7) { brain.lastTickle = time; brain.tickle = 0; brain.squirm = 1; brain.laughUntil = time + 1.8; sound('giggle'); remember('tickle', 'they tickled my side'); const n = brain.memory.count.tickle; say(n >= 3 ? pick(LINES.tickleAgain, n) : pick(LINES.tickle), { urgent: true }); }
+        if (brain.tickle > .5 && time - brain.lastTickle > 7) { brain.lastTickle = time; brain.tickle = 0; brain.squirm = 1; brain.laughUntil = time + 1.8; sound('giggle'); channel.event('laugh'); remember('tickle', 'they tickled my side'); const n = brain.memory.count.tickle; say(n >= 3 ? pick(LINES.tickleAgain, n) : pick(LINES.tickle), { urgent: true }); }
       } else brain.tickle = Math.max(0, brain.tickle - dt);
       // he remembers where it hurt: going firm there again makes him wary
       if (best.p > .95 && brain.memory.zones[best.zone]?.tooHard && time - brain.lastWary > 25 && time - brain.lastPain > 6 && !speaking()) { brain.lastWary = time; say(pick(LINES.wary, best.zone)); }
@@ -1469,7 +1588,7 @@ export default function (ctx) {
     if (brain.phase === 'asleep' && time > brain.nextSnore) { brain.nextSnore = time + 3.8; sound('snore'); drawBubble('Zzz...'); bubbleUntil = time + 2.6; }
     if (brain.cue && !brain.cue.saidOut && time >= brain.cue.out) { brain.cue.saidOut = true; say(pick(LINES.cueOut), { urgent: true }); }
     if (brain.cue && time > brain.cue.out + 6) brain.cue = null;
-    if (brain.queue.length && !speaking() && time >= brain.queue[0].at) { const q = brain.queue.shift(); say(q.text, { mood: q.mood }); }
+    if (brain.queue.length && !speaking() && chat.state !== 'hearing' && !chat.busy && time >= brain.queue[0].at) { const q = brain.queue.shift(); say(q.text, { mood: q.mood }); }
   }
 
   // ---------- the board ----------
@@ -1561,19 +1680,25 @@ export default function (ctx) {
   function talkStatus() {
     if (!chat.on) return 'OFF';
     if (chat.error) return chat.error.toUpperCase();
+    if (live.ready) return chat.state === 'hearing' ? 'HEARING YOU (LIVE)' : 'LIVE: JUST TALK';
+    if (live.ws) return 'CONNECTING';
     if (chat.available === false) return 'NEEDS AN OFFICE RESTART';
     return { starting: 'STARTING', listening: 'LISTENING', hearing: 'HEARING YOU', thinking: 'THINKING', his: 'HIS TURN', line: 'PAUSED: VOICE LINE ON', far: 'COME CLOSER' }[chat.state] || 'ON';
   }
+  try { chat.on = localStorage.getItem('massage-talk') !== '0'; } catch { chat.on = true; }     // on unless you turned it off
   function setTalk(on) {
-    chat.on = on; chat.error = ''; showTalkButton(); boardDirty = true; click(on);
-    if (on) { chat.state = 'starting'; startMic(); probeChat(); } else { stopMic(); chat.chunks = []; chat.pre = []; chat.state = 'off'; }
+    chat.on = on; chat.error = ''; try { localStorage.setItem('massage-talk', on ? '1' : '0'); } catch {} showTalkButton(); boardDirty = true; click(on);
+    if (on) { chat.state = 'starting'; startMic(); probeChat(); } else { stopMic(); liveClose(); chat.chunks = []; chat.pre = []; chat.state = 'off'; }
   }
   async function startMic() {
     if (chat.stream || chat.starting || !audio()) return;
     chat.starting = true;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
-      if (disposed || !chat.on) { stream.getTracks().forEach(t => t.stop()); return; }
+      // share the office voice line's microphone when it has one (no second capture, no second permission)
+      const office = window.officeDebug?.voice?.stream, borrowed = office?.getAudioTracks().some(t => t.readyState === 'live') ? office : null;
+      const stream = borrowed || await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
+      chat.borrowed = !!borrowed;
+      if (disposed || !chat.on) { if (!borrowed) stream.getTracks().forEach(t => t.stop()); return; }
       const src = ac.createMediaStreamSource(stream), sink = ac.createGain(); sink.gain.value = 0; sink.connect(ac.destination);
       let node = null;
       try {                          // the office's capture worklet: 16 kHz 16-bit chunks
@@ -1601,8 +1726,8 @@ export default function (ctx) {
   function stopMic() {
     try { chat.node?.port?.postMessage(false); } catch {}
     for (const n of [chat.src, chat.node, chat.sink]) try { n?.disconnect(); } catch {}
-    chat.stream?.getTracks().forEach(t => t.stop());
-    Object.assign(chat, { stream: null, src: null, node: null, sink: null });
+    if (!chat.borrowed) chat.stream?.getTracks().forEach(t => t.stop());
+    Object.assign(chat, { stream: null, src: null, node: null, sink: null, borrowed: false });
   }
   ctx.onCleanup(stopMic);
   function blocked() {               // why he is not listening right now, if he isn't
@@ -1615,7 +1740,12 @@ export default function (ctx) {
   // A little voice-activity detector on 40 ms chunks: start when it is clearly louder than the room for 80 ms (keeping
   // the 320 ms before, so the first word is not clipped), stop after 0.9 s of quiet or 14 s in all.
   function hearChunk(pcm) {
-    if (!chat.on || chat.available === false) return;
+    if (!chat.on) return;
+    if (live.ws) {                    // the live line hears you itself (and when you stop); the old way waits for it
+      if (live.ready && live.ws.readyState === 1 && bossNow < 3.5) live.ws.send(pcm);
+      return;
+    }
+    if (chat.available === false) return;
     let sum = 0; for (let i = 0; i < pcm.length; i++) { const v = pcm[i] / 32768; sum += v * v; }
     const rms = Math.sqrt(sum / pcm.length), dur = pcm.length / 16000;
     const why = blocked();
@@ -1647,13 +1777,14 @@ export default function (ctx) {
     return btoa(bin);
   }
   function persona() {
-    return `You are ${brain.name}, a man lying face down on a massage and chiropractic table with a towel round your waist, in a playful toy-brick office. ` +
+    const where = !client || client.pose === 'faceDown' ? 'lying face down' : client.pose === 'faceUp' ? 'lying on your back' : 'sitting on the edge of';
+    return `You are ${brain.name}, a ${brain.kind === 'female' ? 'woman' : 'man'} ${where} a massage and chiropractic table, in sports clothes, in a playful toy-brick office. ` +
       `The person talking to you is the therapist working on your back. Why you came in: "${brain.story.why}" ` +
       `Talk as ${brain.name}: casual, warm, a little cheeky, a bit muffled with your face in the face hole. Keep every reply to one or two short sentences, under 30 words. ` +
       'Your memory of this session is below and it is the truth about what has happened. Whenever it fits, refer back to it: what hurt, what cracked, what felt good, what is still tight, what they said earlier. ' +
       'Never claim anything happened that is not in your memory; if you do not remember something, say so. ' +
       'You can coach them: say where it is still tight. To crack your back they put both palms on the stiff level either side of your spine, press in, then a quick push up towards your head; ' +
-      'for your neck they hold your head or neck and give it a quick small twist, each side. If they ask you to move or do something you cannot do lying face down, joke about it. Keep it friendly and PG.';
+      'for your neck they hold your head or neck and give it a quick small twist, each side. If they ask you to roll over, lie face down or sit up, say you are doing it (you really do). If they ask for anything else you cannot do, joke about it. Keep it friendly and PG.';
   }
   async function postChat(body) {
     const send = async fresh => fetch('/api/chat', { method: 'POST', body, headers: { 'Content-Type': 'application/json', 'X-Office-Token': await officeToken(fresh) } });
@@ -1682,6 +1813,7 @@ export default function (ctx) {
       if (bubbleText === '...') bubbleUntil = time;
       if (!heard) return;
       chat.heard = heard; chat.heardAt = time; boardDirty = true;
+      poseAsked(heard);
       remember('youSaid', `they said to me: "${heard}"`); brain.memory.chat.push({ role: 'user', text: heard });
       if (!reply) return;
       brain.memory.chat.push({ role: 'character', text: reply }); if (brain.memory.chat.length > 24) brain.memory.chat.splice(0, 2);
@@ -1692,14 +1824,82 @@ export default function (ctx) {
       if (visit === brain.visit && bubbleText === '...') { drawBubble("Sorry, what was that? Face in the hole."); bubbleUntil = time + 3; }
     } finally { chat.busy = false; boardDirty = true; }
   }
+  function poseAsked(heard) {
+    const asked = /\b(roll(ed)? over|turn over|on(to)? your back|face up)\b/i.test(heard) ? 'faceUp' : /\bsit( up|ting up| on the edge)\b/i.test(heard) ? 'sitting'
+      : /\b(lie|lay) (back )?down|on(to)? your (front|stomach|tummy)|face down\b/i.test(heard) ? 'faceDown' : null;
+    if (asked && client) { client.releaseAll(); brain.grip = null; client.setPose(asked); showPose(); remember('pose', `you asked me to move and I did (${asked})`); }
+  }
+
+  // ---------- the live line: talking to him like you talk to the workers ----------
+  // A Gemini Live voice line through the office (/api/character-live, see speech.py): your microphone streams to it all
+  // the time you are in the clinic, it hears when you start and stop, and his answer streams back in his own voice as
+  // he says it (well under a second after you stop). It knows who he is and his memory of the session, and is told
+  // what happens as it happens (cracks, ouches, what he says himself). His scripted reactions still come from the
+  // lines above; a crack or an ouch cuts across whatever he is saying. Without the live line (an office server
+  // started before it existed) the recorded-turn way above is used instead.
+  const live = { ws: null, ready: false, visit: 0, fails: 0, retryAt: 0, next: 0, sources: [], inTurn: false };
+  function liveOpen() {
+    if (live.ws || disposed || time < live.retryAt || !audio()) return;
+    const pending = live.ws = { readyState: 0, send() {}, close() {} };        // a placeholder while the token comes
+    live.visit = brain.visit; live.ready = false; boardDirty = true;
+    officeToken().then(token => {
+      if (live.ws !== pending) return;
+      const sock = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/api/character-live?token=${encodeURIComponent(token)}`);
+      sock.binaryType = 'arraybuffer'; live.ws = sock;
+      sock.onopen = () => sock.send(JSON.stringify({ type: 'start', persona: persona(), memory: memoryText(), voice: brain.voice }));
+      sock.onmessage = e => { if (live.ws !== sock) return; if (e.data instanceof ArrayBuffer) livePlay(e.data); else liveEvent(JSON.parse(e.data)); };
+      sock.onclose = () => {
+        if (live.ws !== sock) return;
+        if (!live.ready) { live.fails++; live.retryAt = time + (live.fails >= 2 ? 60 : 5); }     // not there (office not restarted yet?): the old way meanwhile
+        else live.retryAt = time + 1;
+        live.ws = null; live.ready = false; live.inTurn = false; if (chat.state === 'hearing') chat.state = 'listening'; boardDirty = true;
+      };
+    }).catch(() => { if (live.ws === pending) { live.ws = null; live.retryAt = time + 10; } });
+  }
+  function liveClose() {
+    const ws = live.ws; live.ws = null; live.ready = false; live.inTurn = false;
+    if (ws?.readyState === 1) { try { ws.send(JSON.stringify({ type: 'stop' })); } catch {} }
+    try { ws?.close(); } catch {}
+    liveFlush(); boardDirty = true;
+  }
+  ctx.onCleanup(liveClose);
+  function liveContext(text) { if (live.ready && live.ws?.readyState === 1) live.ws.send(JSON.stringify({ type: 'context', text })); }
+  function liveFlush() {
+    for (const src of live.sources) { try { src.stop(); } catch {} }
+    live.sources = []; live.next = 0;
+  }
+  function livePlay(data) {
+    if (!audio()) return;
+    if (!live.inTurn) { live.inTurn = true; stopVoice(); speechDone = false; brain.lastSpoke = time; chat.state = 'listening'; }   // his answer cuts any scripted line
+    const pcm = new Int16Array(data), buffer = ac.createBuffer(1, pcm.length, 24000), ch = buffer.getChannelData(0);
+    for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32768;
+    const src = ac.createBufferSource(); src.buffer = buffer; src.connect(out);
+    const at = Math.max(ac.currentTime + .03, live.next); src.start(at); live.next = at + buffer.duration;
+    live.sources.push(src); src.onended = () => { live.sources = live.sources.filter(x => x !== src); };
+    speakingUntil = Math.max(speakingUntil, time + (live.next - ac.currentTime) + .1); bubbleUntil = Math.max(bubbleUntil, speakingUntil + 1.5);
+  }
+  function liveEvent(m) {
+    if (m.type === 'ready') { live.ready = true; live.fails = 0; chat.available = true; chat.state = 'listening'; chat.error = ''; boardDirty = true; }
+    else if (m.type === 'transcript' && m.role === 'user') { chat.heard = m.text.trim(); chat.heardAt = time; chat.state = 'hearing'; }
+    else if (m.type === 'transcript' && m.role === 'character') { drawBubble(m.text.trim()); bubbleUntil = Math.max(bubbleUntil, time + 2); }
+    else if (m.type === 'interrupted') { liveFlush(); live.inTurn = false; speakingUntil = time; }
+    else if (m.type === 'turn_complete') {
+      live.inTurn = false; chat.state = 'listening';
+      if (m.user) { poseAsked(m.user); remember('youSaid', `they said to me: "${m.user}"`); brain.memory.chat.push({ role: 'user', text: m.user }); }
+      if (m.character) { brain.memory.chat.push({ role: 'character', text: m.character }); const said = brain.memory.said; said.push(m.character); if (said.length > 10) said.shift(); }
+      if (brain.memory.chat.length > 24) brain.memory.chat.splice(0, brain.memory.chat.length - 24);
+      boardDirty = true;
+    } else if (m.type === 'error') { console.warn('massage live voice:', m.text); if (/limit/i.test(m.text)) chat.error = 'voice limit reached'; }
+  }
   showTalkButton();
-  root.userData.talk = { chat, setTalk, hearChunk, memoryText };      // for poking at from the console, like brain
+  root.userData.talk = { chat, setTalk, hearChunk, memoryText, live };      // for poking at from the console, like brain
 
   // ---------- targets and hand guides, drawn on his skin ----------
   // Knots he has told you about get a target ring (red, filling in as it melts, a green tick when it lets go). Stiff
   // vertebrae he has mentioned get an amber bar across the spine; the next one gets two palm prints either side of the
   // spine with an arrow towards his head (press in, push up). His neck gets two ghost hands and a twist arrow while a
-  // side is left. Each mark fades while your hand is on it, so it never hides what you are doing.
+  // side is left. Each mark fades while your hand is on it, so it never hides what you are doing; the palm prints instead
+  // light up in your pressure colour under each hand, and every hand on his back gets a pressure ring round it.
   const MARK_LIFT = .0025;
   function skinHeight(x, z) {                  // body-local height of the top of his back at x, z, breathing included
     const u = clamp((x - X0) / LEN, U_LO + .03, U_TOWEL), W = profile(u)[0], n = clamp(z / W, -1, 1), top = restTop(u, n);
@@ -1745,16 +1945,41 @@ export default function (ctx) {
     g.lineTo(x0 + width * 1.4, y + width * 1.3); g.lineTo(x0 + width * 1.4, y + width / 2); g.lineTo(x1, y + width / 2); g.closePath(); g.fill();
   }
 
-  // the back crack: two palms either side of the spine, heels on the stiff level, arrow towards his head
-  const pushArt = markCanvas(512, g => {
-    palmPrint(g, 250, 158, 1.4, true, 'rgba(124,240,255,.34)', 'rgba(255,255,255,.95)');     // heels 6 cm either side of the spine
-    palmPrint(g, 250, 354, 1.4, false, 'rgba(124,240,255,.34)', 'rgba(255,255,255,.95)');
-    arrowLeft(g, 30, 480, 256, 24, 'rgba(255,214,64,.95)');
-    g.fillStyle = 'rgba(255,214,64,.95)'; g.font = 'bold 40px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText('PUSH', 440, 60); g.fillText('UP', 440, 452);
+  // pressure bands, as on the board: light (blue), good (green), firm (amber), too hard (red)
+  const P_MAX = 1.6, BANDS = [[0, .3, '90,160,255'], [.3, .95, '76,175,80'], [.95, 1.3, '245,166,35'], [1.3, P_MAX, '229,57,53']];
+  const bandOf = p => BANDS.find(([, b]) => p < b) || BANDS[3];
+  // the back crack: two palms either side of the spine, heels on the stiff level, arrow towards his head. Each print fills
+  // with your pressure colour while that hand's heel is on it; the arrow turns green once both are on and pressing right.
+  const pushArt = markCanvas(512, (g, S, top = null, bottom = null, go = false) => {
+    const fill = p => p == null ? 'rgba(124,240,255,.34)' : `rgba(${bandOf(p)[2]},.72)`;
+    palmPrint(g, 250, 158, 1.4, true, fill(top), 'rgba(255,255,255,.95)');     // heels 6 cm either side of the spine
+    palmPrint(g, 250, 354, 1.4, false, fill(bottom), 'rgba(255,255,255,.95)');
+    const arrow = go ? 'rgba(76,175,80,.95)' : 'rgba(255,214,64,.95)';
+    arrowLeft(g, 30, 480, 256, 24, arrow);
+    g.fillStyle = arrow; g.font = 'bold 40px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(go ? 'NOW' : 'PUSH', 440, 60); g.fillText(go ? 'PUSH UP' : 'UP', 440, 452);
   });
   const pushMark = skinMark(.32, .32, pushArt.tex); pushArt.redraw();
   const PUSH_HEEL = (250 + 70 * 1.4 - 256) / 512 * .32;   // how far the heels sit from the middle of the mark, towards his waist
+  const PRINT_Z = (256 - 158) / 512 * .32;                 // how far each print's heel sits from the spine (top print: -z)
+  let pushDrawn = '';
+  // your pressure, round each hand on his back: a gauge ring (green stretch = the target, the arc = how deep you are)
+  // in the colour of the band you are in. The hand itself stops at the skin, so this is how you see how deep you are.
+  const halos = {};
+  for (const side of ['left', 'right']) {
+    const art = markCanvas(256, (g, S, p) => {
+      const c = S / 2, R = 100, A0 = -Math.PI / 2, ang = v => A0 + 2 * Math.PI * clamp(v, 0, P_MAX) / P_MAX, col = bandOf(p)[2];
+      g.lineCap = 'butt'; g.lineWidth = 20;
+      g.strokeStyle = 'rgba(20,26,34,.4)'; g.beginPath(); g.arc(c, c, R, 0, Math.PI * 2); g.stroke();
+      g.strokeStyle = 'rgba(76,175,80,.45)'; g.beginPath(); g.arc(c, c, R, ang(.3), ang(.95)); g.stroke();             // the target
+      g.strokeStyle = 'rgba(255,255,255,.95)'; g.lineWidth = 4;
+      for (const v of [.3, .95]) { const a = ang(v); g.beginPath(); g.moveTo(c + (R - 13) * Math.cos(a), c + (R - 13) * Math.sin(a)); g.lineTo(c + (R + 13) * Math.cos(a), c + (R + 13) * Math.sin(a)); g.stroke(); }
+      g.strokeStyle = `rgba(${col},.95)`; g.lineWidth = 12; g.lineCap = 'round';
+      g.beginPath(); g.arc(c, c, R, A0, Math.max(A0 + .05, ang(p))); g.stroke();                                    // how deep you are
+      g.lineWidth = 5; g.beginPath(); g.arc(c, c, R + 17, 0, Math.PI * 2); g.stroke();                              // the colour at a glance
+    });
+    halos[side] = { mesh: skinMark(.25, .25, art.tex, 10), art, p: 0, key: -1 };
+  }
   // stiff levels he has mentioned (not the one the palms are on): an amber bar across the spine; green flash when it goes
   const barArt = { amber: markCanvas(128, g => { g.fillStyle = 'rgba(245,166,35,.9)'; g.beginPath(); g.roundRect(44, 8, 40, 112, 18); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 6; g.stroke(); }),
     green: markCanvas(128, g => { g.strokeStyle = 'rgba(76,175,80,.95)'; g.lineWidth = 12; g.beginPath(); g.arc(64, 64, 48, 0, Math.PI * 2); g.stroke(); }) };
@@ -1838,9 +2063,29 @@ export default function (ctx) {
       m.material.map = justCracked ? barArt.green.tex : barArt.amber.tex;
       showMark(m, !live ? 0 : justCracked ? 1 - (time - seg.crackedAt) / 2.5 : seg.stuck && !seg.cracked && seg.known && seg !== next ? .9 : 0, dt);
     }
-    const guideBack = next && next.known && !brain.push?.armed;
+    const guideBack = next && next.known;
+    const prints = [null, null];                                   // [top (-z), bottom (+z)]: the deepest hand whose heel is on each print
+    if (guideBack) for (const r of results) {
+      const c = r.part === 'torso' && (r.heel || r); if (!c) continue;
+      const i = c.z < 0 ? 0 : 1;
+      if (Math.abs(c.x - next.x) < .04 && Math.abs(Math.abs(c.z) - PRINT_Z) < .045 && (!prints[i] || r.p > prints[i].p)) prints[i] = r;
+    }
+    const printP = prints.map(r => r && Math.round(r.p * 20) / 20), go = printP.every(p => p != null && p >= .3 && p < 1.3);
+    const pushKey = `${printP}|${go}`;
+    if (pushKey !== pushDrawn) { pushDrawn = pushKey; pushArt.redraw(printP[0], printP[1], go); }
     if (next) { pushMark.userData.cx = next.x - PUSH_HEEL; pushMark.userData.cz = 0; }     // heels on the level, fingers up towards his head
-    showMark(pushMark, guideBack ? pulse * (handNear(results, next.x - .04, 0, .14) ? .35 : 1) : 0, dt);
+    const lit = prints.some(Boolean);
+    showMark(pushMark, !guideBack ? 0 : lit ? .85 : pulse * (handNear(results, next.x - .04, 0, .14) ? .35 : 1), dt);
+    // pressure rings round your hands
+    ['left', 'right'].forEach((side, i) => {
+      const r = results[i], h = halos[side], on = r?.part === 'torso';
+      if (on) {
+        h.p = lerp(h.p, r.p, .3); h.mesh.userData.cx = r.x; h.mesh.userData.cz = r.z;
+        const key = Math.round(clamp(h.p, 0, P_MAX) * 30);
+        if (key !== h.key) { h.key = key; h.art.redraw(h.p); }
+      }
+      showMark(h.mesh, on ? .95 : 0, dt);
+    });
     // the neck, once his back is done (or as soon as you go for it), until both sides have gone
     const neckNow = live && neckLeft().length && (brain.neckAsked || !focusSeg() || brain.grip);
     const neckWant = !neckNow ? 0 : brain.grip ? .25 : pulse;
@@ -1868,20 +2113,24 @@ export default function (ctx) {
 
   // ---------- every frame ----------
   const camPos = V(), camLocal = V(), headWorld = V(), tmp = V();
+  const limbGrip = { left: { on: false, was: false, strain: 0 }, right: { on: false, was: false, strain: 0 } };
+  brain.lastStretch = -99;
   let normalsTick = 0, colorsTick = 0, turn = 0, phase = 0, frames = 0;
-  // Centre the table about 0.85 m ahead of your eyes, level, turned so its long side (the client's left) faces you,
-  // and kept inside the Sandbox walls.
-  let placed = false, placedInXR = false, xrTime = 0;
-  function placeInFront(cam) {
-    const office = root.parent; if (!office) return;
-    office.updateWorldMatrix(true, false);
-    const eye = office.worldToLocal(cam.getWorldPosition(V()));
-    const fwd = cam.getWorldDirection(V()).transformDirection(office.matrixWorld.clone().invert()); fwd.y = 0;
-    if (fwd.lengthSq() < 1e-4) fwd.set(0, 0, -1); fwd.normalize();
-    const at = eye.addScaledVector(fwd, .85), R = SANDBOX_ROOM, margin = 1.45;
-    root.position.set(clamp(at.x, R.minX + margin, R.maxX - margin), 0, clamp(at.z, R.minZ + margin, R.maxZ - margin));
-    root.rotation.set(0, Math.atan2(-fwd.x, -fwd.z), 0);
+  // Talking to the client takes the microphone while you are in the clinic: the office voice line to a worker is muted
+  // as you walk in (once; unmute it from the menu if you want it) and unmuted as you leave.
+  let lineMuted = null, wasInClinic = false, talkMicRetry = 0;
+  function clinicVoice(inside) {
+    const line = window.officeDebug?.voice;
+    if (inside && !wasInClinic && chat.on && line?.micEnabled) { line.mute(true); lineMuted = line; ctx.notice('In the clinic: your mic goes to the client. The worker line is muted until you leave.'); }
+    if (!inside && wasInClinic && lineMuted) { if (!lineMuted.micEnabled) lineMuted.mute(false); lineMuted = null; }
+    wasInClinic = inside;
+    if (chat.stream && chat.stream.getAudioTracks().every(t => t.readyState === 'ended')) stopMic();       // the borrowed office mic was turned off
+    if (inside && chat.on && !chat.stream && !chat.starting && time > talkMicRetry) { talkMicRetry = time + 6; startMic(); }
+    if (live.ws && (!inside || !chat.on || live.visit !== brain.visit)) liveClose();
+    else if (inside && chat.on && chat.stream && !live.ws) liveOpen();
+    if (chat.state === 'hearing' && live.ready && time - chat.heardAt > 2.5) chat.state = 'listening';    // he chose not to answer
   }
+  ctx.onCleanup(() => { if (lineMuted && !lineMuted.micEnabled) lineMuted.mute(false); });
   brain.breath = 0; brain.hunchL = brain.hunchR = 0;
   newClient(true);
   ctx.onFrame(dt => {
@@ -1890,13 +2139,8 @@ export default function (ctx) {
     guardTeleport();
     const debug = window.officeDebug, cam = debug?.camera;
     if (cam) { cam.getWorldPosition(camPos); camLocal.copy(camPos); root.worldToLocal(camLocal); }
-    // Spawn in front of wherever you are: once on load, and again once you have been in VR for a moment
-    // (the mod can load on the flat page before you enter, and the office settles its place on the first XR frames).
-    // It then stays put while you walk round it.
-    const presenting = !!debug?.renderer?.xr?.isPresenting;
-    xrTime = presenting ? xrTime + dt : 0;
-    if (!presenting) placedInXR = false;            // each new VR session spawns it in front of you again
-    if (cam && (!placed || (xrTime > .6 && !placedInXR))) { placeInFront(cam); placed = true; placedInXR = presenting; root.updateWorldMatrix(true, true); if (cam) { camLocal.copy(camPos); root.worldToLocal(camLocal); } }
+    if (client) { client.update(dt); for (const rec of clientHands) if (rec.hand) rec.hand.root.visible = false; }   // the old body's hands load late: keep them hidden too
+    if (cam && root.parent) { const o = root.parent.worldToLocal(camPos.clone()); clinicVoice(inClinic(o.x, o.z)); }
     const boss = cam ? Math.hypot(camLocal.x, camLocal.z) : 99;
 
     // TTS that never starts (no voices in this browser): switch to the mumble for good
@@ -1916,6 +2160,23 @@ export default function (ctx) {
     const H = debug?.hands?.hands || {};
     const results = ['left', 'right'].map(side => readHand(H[side], track[side], dt));
     drawHand(H.left, 'left', results[0]); drawHand(H.right, 'right', results[1]);
+    // taking hold of an arm or a leg: pinch or make a fist on it (grip button with controllers), move it, let go
+    for (const side of ['left', 'right']) {
+      const h = H[side], g = limbGrip[side], closed = !!h?.valid && (h.controller ? h.grab : (h.pinch || h.fist));
+      if (!client || !closed || client.moving) { if (g.on) { client?.release(side); g.on = false; } g.was = closed; continue; }
+      const at = h.controller ? h.palm : h.point;
+      if (!g.on && !g.was && !brain.grip) { const got = client.grab(side, at); if (got) { g.on = true; g.strain = 0; g.limb = got; remember('limb', `they took hold of my ${got.replace(/_[lr]$/, '').replace('lower', 'fore').replace('upper', 'upper ').replace('calf', 'lower leg')}`); } }
+      if (g.on) {
+        client.drag(side, at);
+        g.strain = client.gap(side) > .1 ? g.strain + dt : 0;          // pulled past what the joints allow
+        if (g.strain > .45 && time - brain.lastStretch > 4) { brain.lastStretch = time; pain(.7); say(pick(LINES.stretchFar), { urgent: true, sfx: 'ow' }); }
+      }
+      g.was = closed;
+    }
+    if (time >= poseCool && Object.values(H).some(h => h?.valid && (h.controller ? [h.palm] : [h.palm, h.joints.get('index-finger-tip')]).some(p => { const l = posePlinth.worldToLocal(p.clone()); return Math.hypot(l.x, l.z) < .08 && l.y > .86 && l.y < .97; }))) {
+      poseCool = time + 1.5; poseButtonDown = 1; click(true);
+      if (client) setPose(POSE_ORDER[(POSE_ORDER.indexOf(client.trans?.name || client.pose) + 1) % POSE_ORDER.length]);
+    }
     const onButton = (group, p) => { const l = group.worldToLocal(p.clone()); return Math.hypot(l.x, l.z) < .08 && l.y > .86 && l.y < .97; };
     let touchingVoice = false, touchingTalk = false;
     const onKey = (btn, p) => { const l = btn.parent.worldToLocal(p.clone()); return Math.hypot(l.x - btn.position.x, l.z - btn.position.z) < .07 && l.y > .86 && l.y < .97; };
@@ -1939,6 +2200,7 @@ export default function (ctx) {
     if (talkStatus() !== chat.shown) { chat.shown = talkStatus(); boardDirty = true; }
     think(results, dt, boss);
     updateMarks(results, dt);
+    if (client && !prone()) for (const o of body.children) if (!oldBody.includes(o)) o.visible = false;   // targets and guides sit on the face-down back
     contactsForBoard = results.filter(r => r.part === 'torso');
 
     // body: breathing, shoulders, flinches, squirms, head, feet and hands
@@ -1949,7 +2211,7 @@ export default function (ctx) {
     brain.hunchL = lerp(brain.hunchL, .016 * avgTrap('L') + .006 * brain.flinch - .004 * brain.melt, dt * 3);
     brain.hunchR = lerp(brain.hunchR, .016 * avgTrap('R') + .006 * brain.flinch - .004 * brain.melt, dt * 3);
     for (const key of ['flinch', 'squirm', 'kick', 'melt', 'wiggle', 'jolt']) brain[key] = Math.max(0, brain[key] - dt * (key === 'melt' ? .3 : key === 'wiggle' ? .5 : key === 'jolt' ? 3 : 1.6));
-    body.position.y = PAD + .012 * brain.flinch * brain.flinch - .009 * brain.jolt * Math.abs(Math.sin(brain.jolt * 9));   // a crack drops him into the table for a moment
+    body.position.y = PAD + (client ? bodyLift : 0) + .012 * brain.flinch * brain.flinch - .009 * brain.jolt * Math.abs(Math.sin(brain.jolt * 9));   // a crack drops him into the table for a moment
     body.rotation.x = .028 * brain.squirm * Math.sin(time * 26);
     const laughing = time < brain.laughUntil, talking = speaking();
     const want = talking || laughing ? 1.1 : asleep ? .9 : time < brain.ouchUntil ? .45 : 0;
@@ -1962,6 +2224,11 @@ export default function (ctx) {
       headTurn.rotation.x = -turn; headTurn.position.set(headRest.x, headRest.y + .05 * Math.min(1, Math.abs(turn)) + .015 * brain.flinch, headRest.z);
     }
     headTurn.rotation.z = .12 * brain.flinch;
+    if (client) {                                      // the client's head: turned by talking or by your hands; the old head marker follows it
+      const turnDeg = -(brain.headRot + (brain.grip ? brain.snap : 0)) * 180 / Math.PI;
+      client.extra.neck_01 = [0, 6 * brain.flinch, turnDeg * .45]; client.extra.head = [0, 0, turnDeg * .55];
+      headTurn.position.copy(body.worldToLocal(client.bones.head.localToWorld(tmp.set(0, .09, 0))));
+    }
     for (const [i, { foot, toes }] of feet.entries()) {
       const s = i ? -1 : 1;
       foot.rotation.z = .35 * brain.flinch + .5 * brain.kick * Math.sin(time * 22 + i * 2) + .04 * Math.sin(time * .7 + i);
@@ -2020,6 +2287,11 @@ export default function (ctx) {
     headTurn.getWorldPosition(headWorld);
     bubble.visible = time < bubbleUntil;
     if (bubble.visible) { bubble.position.copy(root.worldToLocal(headWorld.clone())).add(tmp.set(.08, .36, .06)); if (cam) bubble.lookAt(camPos); }
+    const tag = !chat.on || bossNow > 3 ? null : chat.error ? [chat.error.toUpperCase(), '#ff8a80'] : time - chat.heardAt < 4 ? [`You: "${chat.heard}"`, '#ffffff']
+      : chat.state === 'hearing' ? ['● HEARING YOU', '#7cf0ff'] : chat.state === 'thinking' ? ['… THINKING', '#ffd640'] : chat.state === 'listening' ? ['● LISTENING', '#4caf50']
+      : chat.state === 'starting' ? ['MIC STARTING', '#9fb0c2'] : chat.state === 'line' ? ['MIC IS ON THE WORKER LINE', '#ffd640'] : null;
+    pill.visible = !!tag;
+    if (tag) { drawPill(...tag); pill.position.copy(root.worldToLocal(headWorld.clone())).add(tmp.set(.08, .22, .06)); if (cam) pill.lookAt(camPos); }
     if (ac && cam) {
       const l = ac.listener, q = cam.getWorldQuaternion(new THREE.Quaternion()), fwd = V(0, 0, -1).applyQuaternion(q), up = V(0, 1, 0).applyQuaternion(q);
       if (l.positionX) { l.positionX.value = camPos.x; l.positionY.value = camPos.y; l.positionZ.value = camPos.z; l.forwardX.value = fwd.x; l.forwardY.value = fwd.y; l.forwardZ.value = fwd.z; l.upX.value = up.x; l.upY.value = up.y; l.upZ.value = up.z; }
@@ -2028,6 +2300,10 @@ export default function (ctx) {
     buttonDown = Math.max(0, buttonDown - dt * 4); button.position.y = .9 - .018 * buttonDown;
     voiceButtonDown = Math.max(0, voiceButtonDown - dt * 4); voiceButton.position.y = .9 - .018 * voiceButtonDown;
     talkButtonDown = Math.max(0, talkButtonDown - dt * 4); talkButton.position.y = .9 - .018 * talkButtonDown;
+    poseButtonDown = Math.max(0, poseButtonDown - dt * 4); poseButton.position.y = .9 - .018 * poseButtonDown;
+    if (client && frames % 15 === 0) showPose();
+    if (brain.postAt && time > brain.postAt) { brain.postAt = 0; channel.post(); }
+    channel.update(dt, time, cam);
     if (time > boardNext && (boardDirty || contactsForBoard.length || frames % 30 === 0)) { boardNext = time + .12; boardDirty = false; drawBoard(); }
   });
 }

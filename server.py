@@ -1078,6 +1078,9 @@ async def sandbox_fresh(request):
     """A page has just opened the Sandbox: save the last build to the sandbox-saves branch and start from an empty room,
     unless another page (the headset, say) is already in the sandbox, so nobody's room is wiped under them."""
     page, now = str((await request.json()).get('page', ''))[:40], time.time()
+    if os.getenv('OFFICE_SANDBOX_FRESH', '1').strip() == '0':   # .env: keep the build whenever the Sandbox is opened
+        sandbox_pages[page] = now
+        return web.json_response({'fresh': False, 'reason': 'keeping the last build (OFFICE_SANDBOX_FRESH=0)'})
     if any(other != page and now - seen < 45 for other, seen in sandbox_pages.items()):
         return web.json_response({'fresh': False, 'reason': 'someone is already in the sandbox'})
     sandbox_pages[page] = now
@@ -1181,9 +1184,10 @@ def record_usd(usd):
         db.commit()
 
 
-# Text to speech for mods (POST /api/tts) and talking to a mod's character (POST /api/chat): see speech.py.
+# Text to speech for mods (POST /api/tts) and talking to a mod's character (POST /api/chat, or live: GET
+# /api/character-live): see speech.py.
 speech = Speech(client, credentials, lambda: credentials.refresh(AuthRequest()), ROOT / 'data' / 'tts-cache',
-                over_limit=lambda: daily() >= DAILY_LIMIT, record=record_usd, off_reason=VOICE_OFF)
+                over_limit=lambda: daily() >= DAILY_LIMIT, record=record_usd, off_reason=VOICE_OFF, token=TOKEN, live_model=MODEL)
 
 app = web.Application(middlewares=[access.middleware], client_max_size=64000)
 app.router.add_get('/api/state', get_state)
@@ -1205,6 +1209,7 @@ app.router.add_get('/api/events', events_socket)
 app.router.add_get('/api/live', live)
 app.router.add_post('/api/tts', speech.handle)
 app.router.add_post('/api/chat', speech.chat)
+app.router.add_get('/api/character-live', speech.live)
 app.router.add_post('/api/pair', access.pair)
 app.router.add_get('/api/quest/state', access.status)
 app.router.add_post('/api/quest/start', access.start)
